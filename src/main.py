@@ -1,7 +1,7 @@
 import torch
 import torchvision
 from tqdm import tqdm
-from encoder import Encoder
+from model.encoder import Encoder
 
 encoder = Encoder()
 
