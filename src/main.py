@@ -30,13 +30,20 @@ def loss_function(predictions, label):
   )
 
 def train_encoder(encoder_model, images):
-  print('images length:', len(images))
+  print('Images length:', len(images))
+  
+  # Split images into training and validation sets (80/20 split)
+  train_size = int(0.8 * len(images))
+  validate_size = len(images) - train_size
+  train_images, validate_images = torch.utils.data.random_split(images, [train_size, validate_size])
+  print('Training set size:', len(train_images))
+  print('Validation set size:', len(validate_images))
   optimizer = torch.optim.Adam(encoder_model.parameters(), lr=0.001)
 
-  train_images = images
   train_images_pbar = tqdm(train_images)
-
-  total_loss = 0
+  validate_images_pbar = tqdm(validate_images)
+  total_train_loss = 0
+  total_validate_loss = 0
 
   for i, (image, label) in enumerate(train_images_pbar):
     optimizer.zero_grad()
@@ -44,19 +51,40 @@ def train_encoder(encoder_model, images):
     image = resize_image(image)
     patches = segment_and_unroll(image)
     classification_probabilities = encoder_model(patches)
-    loss = loss_function(classification_probabilities, label)
-    total_loss += loss.item()
-    average_loss = total_loss/(i+1)
+    train_loss = loss_function(classification_probabilities, label)
+    total_train_loss += train_loss.item()
+    average_train_loss = total_train_loss/(i+1)
     
-    loss.backward()
+    train_loss.backward()
     optimizer.step()
     train_images_pbar.set_postfix({
-      'loss': loss.item(),
-      'average_loss': average_loss
+      'loss': f'{train_loss.item():.4f}',
+      'average_loss': f'{average_train_loss:.4f}'
     })
   
-    if i % 1000 == 0:
-      print('average loss:', average_loss)
+    if i % 10_000 == 1:
+      print('average training loss:', average_train_loss)
+  
+  for i, (image, label) in enumerate(validate_images_pbar):
+    image = resize_image(image)
+    patches = segment_and_unroll(image)
+    classification_probabilities = encoder_model(patches)
+    validate_loss = loss_function(classification_probabilities, label)
+    total_validate_loss += validate_loss.item()
+    average_validate_loss = total_validate_loss/(i+1)
+    
+    # Calculate accuracy
+    predicted_label = torch.argmax(classification_probabilities)
+    correct = (predicted_label == label).item()
+    total_validate_accuracy = total_validate_accuracy + correct if i > 0 else correct
+    average_validate_accuracy = total_validate_accuracy/(i+1)
+    
+    validate_images_pbar.set_postfix({
+      'loss': f'{validate_loss.item():.4f}',
+      'average_loss': f'{average_validate_loss:.4f}',
+      'average_accuracy': f'{average_validate_accuracy:.1%}'
+    })
+  print('average validation loss:', average_validate_loss)
 
 images = import_images()
 encoder_model = Encoder()
