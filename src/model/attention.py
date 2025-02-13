@@ -17,7 +17,7 @@ class Attention(nn.Module):
     q = self.query(x)
     k = self.key(x)
     v = self.value(x)
-    a = torch.matmul(q, k.transpose(0, 1)) / torch.math.sqrt(k.size(-1))
+    a = torch.matmul(q, k.transpose(-2, -1)) / torch.math.sqrt(k.size(-1))
     a = torch.softmax(a, dim=-1)
     x = torch.matmul(a, v)
 

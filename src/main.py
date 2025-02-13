@@ -2,8 +2,8 @@ import torch
 import torchvision
 from tqdm import tqdm
 from model.encoder import Encoder
-
-encoder = Encoder()
+from config import LEARNING_RATE, ATTENTION_BLOCKS, BATCH_SIZE
+import matplotlib.pyplot as plt
 
 def import_images():
     mnist_data = torchvision.datasets.MNIST(root='./data', 
@@ -12,17 +12,26 @@ def import_images():
                               transform=torchvision.transforms.ToTensor())
     return mnist_data
 
-def resize_image(image):
-  return torch.nn.functional.interpolate(image.unsqueeze(0), size=(56, 56), mode='bilinear').squeeze(0)
+def resize_image(image_batch):
+  return torch.nn.functional.interpolate(image_batch, size=(56, 56), mode='bilinear')
 
-def segment_and_unroll(image):
+def segment_and_unroll(image_batch):
+  batch_size = image_batch.shape[0]
   # Take patches of 14x14 pixels each and unroll them into vectors
-  patches = image.flatten().unfold(0, 14 * 14, 14 * 14)
-  return patches
+  patches = []
+  for i in range(batch_size):
+    # Get single image from batch
+    image = image_batch[i][0]  # Shape: [56, 56]
+    # Take 16 patches of 14x14 pixels each and unroll them into vectors
+    image_patches = image.unfold(0, 14, 14).unfold(1, 14, 14)  # Shape: [4, 4, 14, 14]
+    image_patches = image_patches.reshape(-1, 14 * 14)  # Shape: [16, 196]
+    patches.append(image_patches)
+  return torch.stack(patches)  # Shape: [batch_size, 16, 196]
 
-def loss_function(predictions, label):
-  expected_output = torch.zeros(10)
-  expected_output[label] = 1
+def loss_function(predictions, label_batch):
+  batch_size = predictions.shape[0]
+  expected_output = torch.zeros(batch_size, 10)
+  expected_output[torch.arange(batch_size), label_batch] = 1
   return torch.nn.functional.cross_entropy(
     # Get the index of the highest probability prediction
     predictions,
@@ -36,23 +45,28 @@ def train_encoder(encoder_model, images):
   train_size = int(0.8 * len(images))
   validate_size = len(images) - train_size
   train_images, validate_images = torch.utils.data.random_split(images, [train_size, validate_size])
+
+  # Create data loaders
+  train_loader = torch.utils.data.DataLoader(train_images, batch_size=BATCH_SIZE, shuffle=True)
+  validate_loader = torch.utils.data.DataLoader(validate_images, batch_size=BATCH_SIZE, shuffle=True)
+
   print('Training set size:', len(train_images))
   print('Validation set size:', len(validate_images))
-  optimizer = torch.optim.Adam(encoder_model.parameters(), lr=0.001)
+  optimizer = torch.optim.Adam(encoder_model.parameters(), lr=LEARNING_RATE)
 
-  train_images_pbar = tqdm(train_images)
-  validate_images_pbar = tqdm(validate_images)
+  train_images_pbar = tqdm(train_loader)
+  validate_images_pbar = tqdm(validate_loader)
   total_train_loss = 0
   total_validate_loss = 0
 
-  for i, (image, label) in enumerate(train_images_pbar):
+  for i, (image_batch, label_batch) in enumerate(train_images_pbar):
     optimizer.zero_grad()
 
-    image = resize_image(image)
-    patches = segment_and_unroll(image)
+    image_batch = resize_image(image_batch)
+    patches = segment_and_unroll(image_batch)
     classification_probabilities = encoder_model(patches)
-    train_loss = loss_function(classification_probabilities, label)
-    total_train_loss += train_loss.item()
+    train_loss = loss_function(classification_probabilities, label_batch)
+    total_train_loss += train_loss.sum()
     average_train_loss = total_train_loss/(i+1)
     
     train_loss.backward()
@@ -62,21 +76,24 @@ def train_encoder(encoder_model, images):
       'average_loss': f'{average_train_loss:.4f}'
     })
   
-    if i % 10_000 == 1:
+    if i % (10 * BATCH_SIZE) == 1:
       print('average training loss:', average_train_loss)
   
-  for i, (image, label) in enumerate(validate_images_pbar):
-    image = resize_image(image)
-    patches = segment_and_unroll(image)
+  total_validate_accuracy = 0
+  for i, (image_batch, label_batch) in enumerate(validate_images_pbar):
+    batch_size = image_batch.shape[0]
+
+    image_batch = resize_image(image_batch)
+    patches = segment_and_unroll(image_batch)
     classification_probabilities = encoder_model(patches)
-    validate_loss = loss_function(classification_probabilities, label)
-    total_validate_loss += validate_loss.item()
+    validate_loss = loss_function(classification_probabilities, label_batch)
+    total_validate_loss += validate_loss.sum()
     average_validate_loss = total_validate_loss/(i+1)
     
     # Calculate accuracy
-    predicted_label = torch.argmax(classification_probabilities)
-    correct = (predicted_label == label).item()
-    total_validate_accuracy = total_validate_accuracy + correct if i > 0 else correct
+    predicted_label = torch.argmax(classification_probabilities, dim=1)
+    correct = (predicted_label == label_batch)
+    total_validate_accuracy += correct.sum().item()/batch_size
     average_validate_accuracy = total_validate_accuracy/(i+1)
     
     validate_images_pbar.set_postfix({
@@ -87,6 +104,6 @@ def train_encoder(encoder_model, images):
   print('average validation loss:', average_validate_loss)
 
 images = import_images()
-encoder_model = Encoder()
+encoder_model = Encoder(num_attention_blocks=ATTENTION_BLOCKS)
 
 train_encoder(encoder_model, images)
