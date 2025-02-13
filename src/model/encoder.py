@@ -37,7 +37,7 @@ class Encoder(nn.Module):
 
     # Apply multiple combined attention and MLP to encoded patches
     for attention in self.attention_blocks:
-      x = attention(x)
+      x, _ = attention(x, x)
     assert x.shape == (batch_size, 16, 64), f"attention output shape: {x.shape}"
 
     # Pool and classify the output
