@@ -15,6 +15,7 @@ class Encoder(nn.Module):
     ])
 
     self.attention = Attention()
+    self.norm = nn.LayerNorm(64)
     self.pool = nn.AdaptiveAvgPool1d(1)
     self.classifier = nn.Linear(64, 10)
     self.softmax = nn.Softmax(dim=-1)
@@ -37,6 +38,7 @@ class Encoder(nn.Module):
     assert x.shape[1:3] == (16, 64), f"attention output shape: {x.shape[1:3]}"
 
     # Pool and classify the output
+    x = self.norm(x)
     x = x.mean(dim=1)
     assert x.shape[1:2] == (64,), f"pooled output shape: {x.shape[1:2]}"
     x = self.classifier(x)
