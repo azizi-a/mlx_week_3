@@ -1,5 +1,6 @@
 import torch
 import torchvision
+import wandb
 from tqdm import tqdm
 from model.encoder import Encoder
 from config import LEARNING_RATE, ATTENTION_BLOCKS, BATCH_SIZE, EPOCHS
@@ -39,6 +40,17 @@ def loss_function(predictions, label_batch):
   )
 
 def train_encoder(encoder_model, images):
+  # Initialize wandb
+  wandb.init(
+    project="mnist-transformer",
+    config={
+      "learning_rate": LEARNING_RATE,
+      "attention_blocks": ATTENTION_BLOCKS,
+      "batch_size": BATCH_SIZE,
+      "epochs": EPOCHS
+    }
+  )
+  
   print('Images length:', len(images))
   
   # Split images into training and validation sets (80/20 split)
@@ -54,7 +66,7 @@ def train_encoder(encoder_model, images):
   print('Validation set size:', len(validate_images))
   optimizer = torch.optim.Adam(encoder_model.parameters(), lr=LEARNING_RATE)
 
-  for _ in range(EPOCHS):
+  for epoch in range(EPOCHS):
     train_images_pbar = tqdm(train_loader)
     validate_images_pbar = tqdm(validate_loader)
     total_train_loss = 0
@@ -77,7 +89,7 @@ def train_encoder(encoder_model, images):
         'loss': f'{train_loss.item():.4f}',
         'average_loss': f'{average_train_loss:.4f}'
       })
-    
+
     with torch.no_grad():
       for i, (image_batch, label_batch) in enumerate(validate_images_pbar):
         batch_size = image_batch.shape[0]
@@ -100,7 +112,19 @@ def train_encoder(encoder_model, images):
           'average_loss': f'{average_validate_loss:.4f}',
           'average_accuracy': f'{average_validate_accuracy:.1%}'
         })
-      print('average validation loss:', average_validate_loss)
+      
+      # Log training metrics per epoch
+      wandb.log({
+        "epoch": epoch,
+        "train_loss": average_train_loss,
+        "val_loss": average_validate_loss,
+        "val_accuracy": average_validate_accuracy
+      })
+      
+    print('average training loss:', average_train_loss.item())
+    print('average validation loss:', average_validate_loss.item())
+    
+  wandb.finish()
 
 images = import_images()
 encoder_model = Encoder(num_attention_blocks=ATTENTION_BLOCKS)
