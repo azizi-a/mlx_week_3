@@ -8,7 +8,6 @@ class Encoder(nn.Module):
     super().__init__()
 
     self.encode = nn.Linear(14 * 14, 64)
-    self.norm = nn.LayerNorm(64)
     self.positional_encoding = nn.Embedding(BATCH_SIZE, 16, 64)
 
     self.attention_blocks = nn.ModuleList([
@@ -31,8 +30,6 @@ class Encoder(nn.Module):
     # print('pe.shape', pe.shape)
     # x = x + pe
     # assert x.shape == (128, 16, 64), f"positional encoded x.shape: {x.shape}"
-    x = self.norm(x)
-    assert x.shape[1:3] == (16, 64), f"normalised x.shape: {x.shape}"
 
     # Apply multiple combined attention and MLP to encoded patches
     for attention in self.attention_blocks:

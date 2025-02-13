@@ -5,6 +5,7 @@ class Attention(nn.Module):
   def __init__(self):
     super().__init__()
 
+    self.norm = nn.LayerNorm(64)
     self.query = nn.Linear(64, 32)
     self.key = nn.Linear(64, 32)
     self.value = nn.Linear(64, 64)
@@ -14,12 +15,13 @@ class Attention(nn.Module):
 
   def forward(self, x):
     # Attention mechanism
+    x = self.norm(x)
     q = self.query(x)
     k = self.key(x)
     v = self.value(x)
     a = torch.matmul(q, k.transpose(-2, -1)) / torch.math.sqrt(k.size(-1))
     a = torch.softmax(a, dim=-1)
-    x = torch.matmul(a, v)
+    x = x + torch.matmul(a, v)
 
     # MLP
     x = self.linear_in(x)
