@@ -8,7 +8,7 @@ class Encoder(nn.Module):
     super().__init__()
 
     self.encode = nn.Linear(14 * 14, 64)
-    self.positional_encoding = nn.Embedding(BATCH_SIZE, 16, 64)
+    self.positional_encoding = nn.Embedding(16, 64)
 
     self.attention_blocks = nn.ModuleList([
       Attention() for _ in range(num_attention_blocks)
@@ -22,26 +22,29 @@ class Encoder(nn.Module):
 
   def forward(self, x):
     # Take 16 image patches of 14x14 pixels each and encode them
-    assert x.shape[1:3] == (16, 196), f"x.shape: {x.shape[1:3]}"
+    batch_size = x.shape[0]
+    assert x.shape == (batch_size, 16, 196), f"x.shape: {x.shape}"
     x = self.encode(x)
-    assert x.shape[1:3] == (16, 64), f"encoded x.shape: {x.shape[1:3]}"
-    # position = torch.arange(x.size(0))
-    # print('position.shape', position.shape)
-    # pe = self.positional_encoding(position)
-    # print('pe.shape', pe.shape)
-    # x = x + pe
-    # assert x.shape == (128, 16, 64), f"positional encoded x.shape: {x.shape}"
+    assert x.shape == (batch_size, 16, 64), f"encoded x.shape: {x.shape}"
+    
+    # Create positional encodings for each position in sequence
+    position = torch.arange(x.size(1))
+    pe = self.positional_encoding(position.expand(batch_size, -1))
+
+    # Add positional encodings to each item in batch
+    x = x + pe
+    assert x.shape == (batch_size, 16, 64), f"positional encoded x.shape: {x.shape}"
 
     # Apply multiple combined attention and MLP to encoded patches
     for attention in self.attention_blocks:
       x = attention(x)
-    assert x.shape[1:3] == (16, 64), f"attention output shape: {x.shape[1:3]}"
+    assert x.shape == (batch_size, 16, 64), f"attention output shape: {x.shape}"
 
     # Pool and classify the output
     x = self.norm(x)
     x = x.mean(dim=1)
-    assert x.shape[1:2] == (64,), f"pooled output shape: {x.shape[1:2]}"
+    assert x.shape == (batch_size, 64), f"pooled output shape: {x.shape}"
     x = self.classifier(x)
-    assert x.shape[1:2] == (10,), f"classifier output shape: {x.shape[1:2]}"
+    assert x.shape == (batch_size, 10), f"classifier output shape: {x.shape}"
     x = self.softmax(x)
     return x
