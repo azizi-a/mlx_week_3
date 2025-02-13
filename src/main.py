@@ -2,7 +2,7 @@ import torch
 import torchvision
 from tqdm import tqdm
 from model.encoder import Encoder
-from config import LEARNING_RATE, ATTENTION_BLOCKS, BATCH_SIZE
+from config import LEARNING_RATE, ATTENTION_BLOCKS, BATCH_SIZE, EPOCHS
 import matplotlib.pyplot as plt
 
 def import_images():
@@ -54,54 +54,53 @@ def train_encoder(encoder_model, images):
   print('Validation set size:', len(validate_images))
   optimizer = torch.optim.Adam(encoder_model.parameters(), lr=LEARNING_RATE)
 
-  train_images_pbar = tqdm(train_loader)
-  validate_images_pbar = tqdm(validate_loader)
-  total_train_loss = 0
-  total_validate_loss = 0
+  for _ in range(EPOCHS):
+    train_images_pbar = tqdm(train_loader)
+    validate_images_pbar = tqdm(validate_loader)
+    total_train_loss = 0
+    total_validate_loss = 0
+    total_validate_accuracy = 0
 
-  for i, (image_batch, label_batch) in enumerate(train_images_pbar):
-    optimizer.zero_grad()
+    for i, (image_batch, label_batch) in enumerate(train_images_pbar):
+      optimizer.zero_grad()
 
-    image_batch = resize_image(image_batch)
-    patches = segment_and_unroll(image_batch)
-    classification_probabilities = encoder_model(patches)
-    train_loss = loss_function(classification_probabilities, label_batch)
-    total_train_loss += train_loss.sum()
-    average_train_loss = total_train_loss/(i+1)
+      image_batch = resize_image(image_batch)
+      patches = segment_and_unroll(image_batch)
+      classification_probabilities = encoder_model(patches)
+      train_loss = loss_function(classification_probabilities, label_batch)
+      total_train_loss += train_loss.sum()
+      average_train_loss = total_train_loss/(i+1)
+      
+      train_loss.backward()
+      optimizer.step()
+      train_images_pbar.set_postfix({
+        'loss': f'{train_loss.item():.4f}',
+        'average_loss': f'{average_train_loss:.4f}'
+      })
     
-    train_loss.backward()
-    optimizer.step()
-    train_images_pbar.set_postfix({
-      'loss': f'{train_loss.item():.4f}',
-      'average_loss': f'{average_train_loss:.4f}'
-    })
-  
-    if i % (10 * BATCH_SIZE) == 1:
-      print('average training loss:', average_train_loss)
-  
-  total_validate_accuracy = 0
-  for i, (image_batch, label_batch) in enumerate(validate_images_pbar):
-    batch_size = image_batch.shape[0]
+    with torch.no_grad():
+      for i, (image_batch, label_batch) in enumerate(validate_images_pbar):
+        batch_size = image_batch.shape[0]
 
-    image_batch = resize_image(image_batch)
-    patches = segment_and_unroll(image_batch)
-    classification_probabilities = encoder_model(patches)
-    validate_loss = loss_function(classification_probabilities, label_batch)
-    total_validate_loss += validate_loss.sum()
-    average_validate_loss = total_validate_loss/(i+1)
-    
-    # Calculate accuracy
-    predicted_label = torch.argmax(classification_probabilities, dim=1)
-    correct = (predicted_label == label_batch)
-    total_validate_accuracy += correct.sum().item()/batch_size
-    average_validate_accuracy = total_validate_accuracy/(i+1)
-    
-    validate_images_pbar.set_postfix({
-      'loss': f'{validate_loss.item():.4f}',
-      'average_loss': f'{average_validate_loss:.4f}',
-      'average_accuracy': f'{average_validate_accuracy:.1%}'
-    })
-  print('average validation loss:', average_validate_loss)
+        image_batch = resize_image(image_batch)
+        patches = segment_and_unroll(image_batch)
+        classification_probabilities = encoder_model(patches)
+        validate_loss = loss_function(classification_probabilities, label_batch)
+        total_validate_loss += validate_loss.sum()
+        average_validate_loss = total_validate_loss/(i+1)
+        
+        # Calculate accuracy
+        predicted_label = torch.argmax(classification_probabilities, dim=1)
+        correct = (predicted_label == label_batch)
+        total_validate_accuracy += correct.sum().item()/batch_size
+        average_validate_accuracy = total_validate_accuracy/(i+1)
+        
+        validate_images_pbar.set_postfix({
+          'loss': f'{validate_loss.item():.4f}',
+          'average_loss': f'{average_validate_loss:.4f}',
+          'average_accuracy': f'{average_validate_accuracy:.1%}'
+        })
+      print('average validation loss:', average_validate_loss)
 
 images = import_images()
 encoder_model = Encoder(num_attention_blocks=ATTENTION_BLOCKS)
