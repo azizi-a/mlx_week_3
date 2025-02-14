@@ -3,7 +3,7 @@ import torchvision
 import wandb
 from tqdm import tqdm
 from model.encoder import Encoder
-from config import LEARNING_RATE, ATTENTION_BLOCKS, BATCH_SIZE, EPOCHS
+from config import LEARNING_RATE, BATCH_SIZE, EPOCHS
 import matplotlib.pyplot as plt
 
 def import_images():
@@ -45,7 +45,6 @@ def train_encoder(encoder_model, images):
     project="mnist-transformer",
     config={
       "learning_rate": LEARNING_RATE,
-      "attention_blocks": ATTENTION_BLOCKS,
       "batch_size": BATCH_SIZE,
       "epochs": EPOCHS
     }
@@ -127,6 +126,6 @@ def train_encoder(encoder_model, images):
   wandb.finish()
 
 images = import_images()
-encoder_model = Encoder(num_attention_blocks=ATTENTION_BLOCKS)
+encoder_model = Encoder()
 
 train_encoder(encoder_model, images)

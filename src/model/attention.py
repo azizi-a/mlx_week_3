@@ -1,19 +1,20 @@
 import torch
 import torch.nn as nn
+from config import EMBEDDING_DIM, LATENT_DIM
 
 class Attention(nn.Module):
   def __init__(self):
     super().__init__()
 
-    self.norm_1 = nn.LayerNorm(64)
-    self.norm_2 = nn.LayerNorm(64)
-    self.query = nn.Linear(64, 32)
-    self.key = nn.Linear(64, 32)
-    self.value = nn.Linear(64, 64)
-    self.norm_3 = nn.LayerNorm(64)
-    self.linear_in = nn.Linear(64, 32)
+    self.norm_1 = nn.LayerNorm(EMBEDDING_DIM)
+    self.norm_2 = nn.LayerNorm(EMBEDDING_DIM)
+    self.query = nn.Linear(EMBEDDING_DIM, LATENT_DIM)
+    self.key = nn.Linear(EMBEDDING_DIM, LATENT_DIM)
+    self.value = nn.Linear(EMBEDDING_DIM, EMBEDDING_DIM)
+    self.norm_3 = nn.LayerNorm(EMBEDDING_DIM)
+    self.linear_in = nn.Linear(EMBEDDING_DIM, LATENT_DIM)
     self.relu = nn.ReLU()
-    self.linear_out = nn.Linear(32, 64)
+    self.linear_out = nn.Linear(LATENT_DIM, EMBEDDING_DIM)
 
   def forward(self, x, y, mask=None):
     # Attention mechanism
