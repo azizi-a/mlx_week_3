@@ -24,9 +24,9 @@ class Attention(nn.Module):
     k = self.key(y)
     v = self.value(y)
     a = torch.matmul(q, k.transpose(-2, -1)) / torch.math.sqrt(k.size(-1))
-    # mask is 1 for valid positions, 0 for invalid positions
+    # mask is 0 for valid positions, 1 for invalid positions
     if mask is not None:
-      a = a.masked_fill(mask == 0, float('-inf'))
+      a = a.masked_fill(mask != 0, float('-inf'))
     a = torch.softmax(a, dim=-1)
     dx = torch.matmul(a, v)
     x = x + dx

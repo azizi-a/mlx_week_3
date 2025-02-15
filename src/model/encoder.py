@@ -40,11 +40,4 @@ class Encoder(nn.Module):
       x, _ = attention(x, x)
     assert x.shape == (batch_size, NUM_PATCHES, EMBEDDING_DIM), f"attention output shape: {x.shape}"
 
-    # Pool and classify the output
-    x = self.norm(x)
-    x = x.mean(dim=1)
-    assert x.shape == (batch_size, EMBEDDING_DIM), f"pooled output shape: {x.shape}"
-    x = self.classifier(x)
-    assert x.shape == (batch_size, 10), f"classifier output shape: {x.shape}"
-    x = self.softmax(x)
     return x
